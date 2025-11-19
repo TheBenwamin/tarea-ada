@@ -1,0 +1,383 @@
+\documentclass[12pt,letterpaper]{article}
+\usepackage[spanish]{babel}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{booktabs}
+
+% Configuración de código
+\geometry{margin=1in}
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray},
+    stringstyle=\color{red},
+    breaklines=true,
+    numbers=left,
+    numberstyle=\tiny,
+    frame=single,
+    backgroundcolor=\color{white},
+}
+
+\title{\textbf{Entrega 1: Esquema SRTBOT\\Problema de la Torta de Cumpleaños}}
+\author{\textbf{Integrantes:} Benjamín Farías y Francisco Solís}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section*{Resumen Ejecutivo}
+
+En esta entrega se presenta el esquema \textbf{SRTBOT} (Subproblema, Relación, Tabla, Borde, Orden, Transición) como marco metodológico para resolver el problema de la torta de cumpleaños mediante programación dinámica. Se implementa utilizando tablas de hash (diccionarios en Python) con memoización top-down. El objetivo es establecer claramente la estrategia de solución antes de optimizaciones posteriores.
+
+\section*{Alcance}
+
+Este informe cubre:
+
+\begin{itemize}
+    \item \textbf{Análisis del problema}: Descripción formal del problema de la torta de cumpleaños y su modelado como un juego de suma cero con dos jugadores
+    \item \textbf{Esquema SRTBOT}: Aplicación sistemática de los seis componentes (Subproblema, Relación, Tabla, Borde, Orden, Transición) al problema específico
+    \item \textbf{Estrategia minimax}: Implementación de la lógica que permite al profesor maximizar su satisfacción mientras la hermana intenta minimizarla
+    \item \textbf{Memoización con diccionarios}: Técnica de programación dinámica top-down usando tablas de hash para evitar recálculos
+    \item \textbf{Análisis de complejidad}: Cálculo formal de las complejidades temporal ($O(n^3)$) y espacial ($O(n^2)$)
+    \item \textbf{Pseudocódigo e implementación}: Presentación clara del algoritmo antes de su implementación en Python
+\end{itemize}
+
+El informe \textbf{NO} cubre:
+
+\begin{itemize}
+    \item Optimizaciones posteriores o versiones paralelas del algoritmo
+    \item Comparación con otras técnicas de resolución (por ejemplo, programación dinámica bottom-up con arreglos multidimensionales)
+    \item Problemas variantes del juego de la torta (por ejemplo, porciones con pesos diferentes, número impar de jugadores)
+    \item Aplicaciones prácticas fuera del contexto académico
+\end{itemize}
+
+%===============================================================================
+\section{Contextualización del Problema}
+%===============================================================================
+
+\subsection{Descripción del Problema}
+
+El profesor y su hermana comparten una torta redonda dividida en $2n$ porciones iguales, numeradas de $0$ a $2n-1$ en sentido antihorario. Cada porción $i$ tiene asociado un valor de satisfacción $st_i \in \mathbb{Z}$ (puede ser negativo, cero o positivo).
+
+\begin{itemize}
+    \item Los dos jugadores se alternan para elegir un ángulo válido $\alpha_i$
+    \item El jugador que elige $\alpha_i$ se come las porciones desde $\alpha_i$ hasta $\alpha_i + \pi$ (en sentido antihorario)
+    \item Esto equivale a consumir exactamente $n$ porciones consecutivas
+    \item El profesor comienza el juego (turno 0)
+    \item Ambos jugadores juegan de manera óptima para maximizar su propia satisfacción
+\end{itemize}
+
+\subsection{Objetivo}
+
+Determinar la máxima satisfacción total \textbf{garantizada} que puede obtener el profesor si ambos jugadores juegan óptimamente. En teoría de juegos, esta es la solución minimax del juego.
+
+%===============================================================================
+\section{Esquema SRTBOT}
+%===============================================================================
+
+\subsection{S: Subproblema}
+
+Se define la función:
+\[
+f(i, j, t) = \text{máxima satisfacción garantizada para el Profesor}
+\]
+
+donde:
+\begin{itemize}
+    \item $i, j \in \{0, 1, \ldots, 2n-1\}$: índices inicial y final del rango de porciones dis:ponibles
+    \item $j - i + 1 \geq n$: el rango debe contener al menos $n$ porciones
+    \item $t \in \{0, 1\}$: indicador de turno
+    \begin{itemize}
+        \item $t = 0$: es turno del Profesor (maximiza su satisfacción)
+        \item $t = 1$: es turno de la Hermana (minimiza la satisfacción del Profesor)
+    \end{itemize}
+\end{itemize}
+
+\textbf{Interpretación:} El valor $f(i, j, t)$ representa la máxima satisfacción que el profesor puede garantizarse si ambos juegan óptimamente desde el estado actual (porciones $[i, j]$ disponibles, turno $t$).
+
+\subsection{R: Relación de Recurrencia}
+
+Sean $n$ = número de porciones por jugada, $\text{suma}(a, b)$ = $\sum_{k=a}^{b} st_k$ la suma de satisfacciones en el rango $[a, b]$.
+
+\subsubsection{Casos Base}
+
+\begin{align}
+\text{Si } j - i + 1 &< n: &f(i, j, t) &= 0 \label{eq:base1}\\
+\text{Si } j - i + 1 &= n: &f(i, j, t) &= \text{suma}(i, j) \label{eq:base2}
+\end{align}
+
+En el caso base \eqref{eq:base2}, cuando quedan exactamente $n$ porciones, solo es posible una última jugada que se las lleva todas. No hay turnos posteriores.
+
+\subsubsection{Caso Recursivo}
+
+Para $j - i + 1 > n$, consideramos todas las jugadas válidas del jugador actual:
+
+\textbf{Si } $t = 0$ \textbf{(turno del Profesor — maximiza):}
+\[
+f(i, j, 0) = \max_{k=i}^{j-n+1} \left[ \text{suma}(k, k+n-1) + f(k+n, j, 1) \right]
+\]
+
+El profesor elige el índice $k$ donde comenzará su jugada, eligiendo $n$ porciones consecutivas desde $k$ hasta $k+n-1$, obteniendo $\text{suma}(k, k+n-1)$. Las porciones restantes $[k+n, j]$ quedan para el siguiente turno (hermana).
+
+\textbf{Si } $t = 1$ \textbf{(turno de la Hermana — minimiza):}
+\[
+f(i, j, 1) = \min_{k=i}^{j-n+1} \left[ f(k+n, j, 0) \right]
+\]
+
+La hermana elige dónde comenzar su jugada de manera que minimice la satisfacción futura garantizada del profesor. La hermana no obtiene satisfacción directa en esta formulación; solo reduce las porciones disponibles.
+
+\subsection{B: Borde (Casos Base)}
+
+Los casos base determinan cuándo termina la recursión:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|p{3cm}|p{2.5cm}|p{5cm}|}
+\hline
+\textbf{Condición} & \textbf{Valor} & \textbf{Justificación} \\
+\hline
+Porciones restantes $< n$ & $0$ & No es posible hacer una jugada válida \\
+\hline
+Porciones restantes $= n$ & $\text{suma}(i, j)$ & Última jugada, se llevan todas las porciones \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{T: Tabla / Técnica de Memoización}
+
+Se implementa utilizando una estructura de diccionario para memoización:
+
+\subsubsection{Estructura de Datos: Tablas de Hash (Diccionarios)}
+
+Estructura mediante diccionario:
+\[
+\text{memo}[(i, j, t)] = f(i, j, t)
+\]
+
+donde la clave es una tupla $(i, j, t)$ y el valor es la solución memoizada. Esta estructura permite almacenar solo los subproblemas que efectivamente se calculan, sin necesidad de preasignar espacio para todas las combinaciones posibles.
+
+\subsection{O: Orden de Cálculo}
+
+Se utilizará memoización con cálculo \textbf{bajo demanda} (top-down):
+
+\begin{enumerate}
+    \item Se inicia con la llamada a $f(0, 2n-1, 0)$ (profesor elige primero con todas las porciones)
+    \item Cada llamada recursiva verifica si el resultado ya está memoizado
+    \item Si no está, se calcula recursivamente
+    \item El resultado se almacena en la tabla de memoización antes de retornar
+    \item La recursión termina cuando se alcanza un caso base
+\end{enumerate}
+
+El conjunto de subproblemas visitados depende del árbol de recursión, pero en el peor caso se pueden visitar $O((2n)^2)$ pares $(i, j)$ con 2 posibles turnos.
+
+\subsection{T (Segunda T): Transición y Complejidad}
+
+\subsubsection{Transición de Estado}
+
+Cada estado se calcula explorando todas las transiciones posibles:
+\begin{itemize}
+    \item Un estado $(i, j, t)$ transiciona a múltiples estados $(i', j', t')$
+    \item Número de transiciones por estado: $O(n)$ (una por cada posición donde se puede hacer una jugada)
+    \item Total de transiciones: $O((2n)^2 \cdot n) = O(n^3)$
+\end{itemize}
+
+\subsubsection{Complejidad Temporal y Espacial}
+
+\begin{itemize}
+    \item \textbf{Tiempo}: $O(n^3)$ en el caso promedio (para memoización)
+    \begin{itemize}
+        \item $O((2n)^2)$ subproblemas posibles
+        \item $O(n)$ operaciones por subproblema
+    \end{itemize}
+    \item \textbf{Espacio}: $O(n^2)$ en promedio
+    \begin{itemize}
+        \item Profundidad de recursión: $O(n)$
+        \item Tabla de memoización: $O((2n)^2) = O(n^2)$ entradas
+    \end{itemize}
+\end{itemize}
+
+%===============================================================================
+\section{Implementación de la Estrategia}
+%===============================================================================
+
+\subsection{Estructuras de Datos}
+
+Se utiliza una estructura de memoización basada en diccionarios:
+
+\subsubsection{Diccionarios (Hash Table)}
+
+Estructura clara y eficiente para esta implementación:
+
+\begin{lstlisting}
+memo = {}  # Diccionario vacío
+# Clave: (i, j, turno) - tupla con índices y turno
+# Valor: f(i, j, turno) - máxima satisfacción garantizada
+\end{lstlisting}
+
+\subsection{Pseudocódigo del Algoritmo}
+
+\begin{lstlisting}
+function satisfaccion_hash(st, n):
+    // Inicialización
+    total_porciones ← 2 * n
+    memo ← {}  // Diccionario para memoización
+
+    // Función auxiliar: suma de rango [inicio, fin]
+    function suma_rango(inicio, fin):
+        if inicio ≤ fin:
+            return sum(st[inicio : fin+1])
+        else:
+            return 0
+
+    // Función recursiva principal
+    function resolver(i, j, turno):
+        // PASO 1: Verificar memoización
+        clave ← (i, j, turno)
+        if clave ∈ memo:
+            return memo[clave]
+
+        // PASO 2: Calcular tamaño del subproblema
+        tamaño ← j - i + 1
+
+        // CASO BASE 1: Menos de n porciones
+        if tamaño < n:
+            resultado ← 0
+
+        // CASO BASE 2: Exactamente n porciones (última jugada)
+        else if tamaño == n:
+            resultado ← suma_rango(i, j)
+
+        // CASO RECURSIVO: Más de n porciones
+        else:
+            if turno == 0:  // TURNO DEL PROFESOR (MAXIMIZA)
+                mejor ← -∞
+
+                for k from i to j-n+1:  // Posiciones válidas de inicio
+                    ganancia_profesor ← suma_rango(k, k+n-1)
+
+                    siguiente_i ← k + n
+                    siguiente_j ← j
+
+                    if siguiente_i ≤ siguiente_j:
+                        futuro ← resolver(siguiente_i, siguiente_j, 1)
+                    else:
+                        futuro ← 0
+
+                    valor_total ← ganancia_profesor + futuro
+                    mejor ← max(mejor, valor_total)
+
+                resultado ← mejor
+
+            else:  // TURNO DE LA HERMANA (MINIMIZA)
+                mejor ← +∞
+
+                for k from i to j-n+1:  // Posiciones válidas de inicio
+                    siguiente_i ← k + n
+                    siguiente_j ← j
+
+                    if siguiente_i ≤ siguiente_j:
+                        futuro ← resolver(siguiente_i, siguiente_j, 0)
+                    else:
+                        futuro ← 0
+
+                    mejor ← min(mejor, futuro)
+
+                resultado ← mejor
+
+        // PASO 3: Memoizar resultado
+        memo[clave] ← resultado
+        return resultado
+
+    // INICIALIZACIÓN: todas las porciones, turno del profesor
+    return resolver(0, total_porciones-1, 0)
+\end{lstlisting}
+
+\subsection{Ejemplo de Ejecución}
+
+\subsubsection{Entrada Ejemplo}
+
+\[
+n = 2, \quad st = [3, 1, 2, -1]
+\]
+
+Porciones: 4 (2n=4). Cada jugada consume 2 porciones consecutivas.
+
+\subsubsection{Árbol de Recursión (Parcial)}
+
+\begin{verbatim}
+resolver(0, 3, 0)  [Profesor elige entre posiciones 0 y 2]
+├─ Opción 1: come [0,1] → suma=4
+│  └─ resolver(2, 3, 1)  [Hermana elige posición 2]
+│     └─ come [2,3] → suma=1
+│        └─ Total Profesor: 4 + 1 = 5
+├─ Opción 2: come [1,2] → suma=3
+│  └─ resolver(3, 3, 1)  [Menos de 2 porciones]
+│     └─ No puede jugar → 0
+│        └─ Total Profesor: 3 + 0 = 3
+└─ Opción 3: come [2,3] → suma=1
+   └─ resolver(4, 3, 1)  [Rango inválido]
+      └─ No puede jugar → 0
+         └─ Total Profesor: 1 + 0 = 1
+
+Máximo: max(5, 3, 1) = 5 (con opción 1)
+
+Pero en opción 1, es turno de la Hermana (minimiza):
+└─ resolver(2, 3, 1) [Hermana elige posición 2]
+   └─ Opción única: come [2,3] → suma=1
+      └─ resolver(4, 3, 0) → inválido, retorna 0
+         └─ Total Profesor: 0
+      Hermana minimiza: min(0) = 0
+
+Entonces opción 1 da: 4 + 0 = 4
+
+Resultado final: max(4, 3, 1) = 4
+\end{verbatim}
+
+\section{Ejemplos de Casos Base}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|p{2cm}|p{3cm}|p{2cm}|p{2cm}|}
+\hline
+\textbf{$n$} & \textbf{st (satisfacciones)} & \textbf{Porciones} & \textbf{Resultado} \\
+\hline
+2 & [1, 2, 3, 4] & 4 & 6 \\
+\hline
+2 & [5, -5, 3, -3] & 4 & 2 \\
+\hline
+1 & [10, -5, 8, -2] & 4 & 10 \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Conclusiones}
+
+El esquema SRTBOT proporciona una estructura clara y sistemática para abordar el problema de la torta de cumpleaños:
+
+\begin{enumerate}
+    \item La definición del subproblema captura el conflicto entre dos jugadores en un juego alternado
+    \item La relación de recurrencia implementa la lógica minimax (maximizar para el profesor, minimizar para la hermana)
+    \item La memoización con diccionarios permite evitar recalcular subproblemas de manera eficiente
+    \item La complejidad resultante $O(n^3)$ es viable para valores moderados de $n$
+    \item La implementación con tablas de hash es clara, intuitiva y fácil de depurar
+\end{enumerate}
+
+%===============================================================================
+\section{Referencias}
+
+\begin{itemize}
+    \item \href{https://github.com/Zelechos/Introduccion_a_los_Algoritmos/blob/main/Introduction_to_Algorithms_Third_Edition_(2009).pdf}{Algoritmos de Programación Dinámica - Cormen, Leiserson, Rivest, Stein}
+    \item Teoría de Juegos Combinatorios
+    \item Técnica SRTBOT - Análisis de Algoritmos (Curso ADA)
+\end{itemize}
+
+\end{document}
+

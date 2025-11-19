@@ -1,0 +1,235 @@
+================================================================================
+                         ESQUEMA SRTBOT - TORTA DE CUMPLEAÑOS
+================================================================================
+
+CONTEXTO DEL PROBLEMA:
+- Una torta redonda se divide en 2n porciones iguales (numeradas 0 a 2n-1)
+- Cada porción i tiene un valor de satisfacción st[i] (puede ser negativo o positivo)
+- Dos jugadores (Profesor y Hermana) se alternan eligiendo ángulos válidos
+- Quien elige un ángulo α se come porciones en sentido antihorario desde α hasta α + π
+- Esto equivale a elegir un rango de n porciones consecutivas
+- El Profesor comienza (turno 0) y desea MAXIMIZAR su satisfacción garantizada
+- Ambos juegan óptimamente (equilibrio minimax)
+
+================================================================================
+1. SUBPROBLEMA (S)
+================================================================================
+
+Definición formal:
+    f(i, j, turno) = máxima satisfacción garantizada para el Profesor
+                     cuando quedan porciones desde i hasta j (en orden circular)
+                     y es el turno del jugador indicado
+
+Parámetros:
+    - i: índice inicial del rango de porciones disponibles
+    - j: índice final del rango de porciones disponibles
+    - turno: 0 (Profesor) si le toca maximizar, 1 (Hermana) si le toca minimizar
+
+Nota: Para simplificar, trabajaremos con una representación lineal considerando
+      que el rango [i, j] contiene j - i + 1 porciones consecutivas
+
+Interpretación alternativa (más simple):
+    f(i, j, turno) = máxima satisfacción garantizada para el Profesor
+                     cuando restan porciones en el rango [i, j]
+                     turno = 0 → es turno del Profesor (maximiza su satisfacción)
+                     turno = 1 → es turno de la Hermana (minimiza satisfacción del Profesor)
+
+================================================================================
+2. RELACIÓN DE RECURRENCIA (R)
+================================================================================
+
+CASO BASE:
+    Si el rango [i, j] contiene exactamente n porciones (una jugada válida):
+        - Si turno = 0 (Profesor):
+            f(i, j, 0) = suma de satisfacciones en [i, j] + f(nuevo_i, nuevo_j, 1)
+        - Si turno = 1 (Hermana):
+            f(i, j, 1) = min(f después de cada jugada posible de la Hermana)
+
+CASO RECURSIVO:
+    Si el rango [i, j] tiene más de n porciones:
+        - Si turno = 0 (Profesor - MAXIMIZA):
+            f(i, j, 0) = max { suma(i, k) + f(i+n, j, 1) | para cada jugada válida }
+                        donde suma(i, k) = suma de porciones de i a i+n-1
+
+        - Si turno = 1 (Hermana - MINIMIZA):
+            f(i, j, 1) = min { f(i+1, j, 0), f(i+2, j, 0), ..., f(i hasta que queden n) }
+                        considera todas las jugadas válidas de la Hermana
+
+PSEUDOCÓDIGO DE LA RECURRENCIA:
+
+    function f(i, j, turno, memo):
+        # Verificar si ya fue calculado
+        if (i, j, turno) in memo:
+            return memo[(i, j, turno)]
+
+        tamaño = j - i + 1
+
+        # Caso base: restan exactamente n porciones (última jugada)
+        if tamaño == n:
+            resultado = suma(st[i:i+n])
+            if quedan más porciones:
+                resultado += f(siguiente_rango, siguiente_turno, memo)
+            else:
+                resultado = suma(st[i:i+n])  # Última jugada, no hay continuación
+            return resultado
+
+        # Caso recursivo
+        if turno == 0:  # Turno del Profesor (MAXIMIZA)
+            mejor = -inf
+            for inicio_hermana in rango_válido(i, j, n):
+                ganancia_profesor = suma(st[inicio_hermana:inicio_hermana+n])
+                siguiente_i, siguiente_j = actualizar_rango_después(inicio_hermana)
+                futuro = f(siguiente_i, siguiente_j, 1, memo)
+                mejor = max(mejor, ganancia_profesor + futuro)
+
+        else:  # turno == 1, Turno de la Hermana (MINIMIZA para el Profesor)
+            mejor = inf
+            for inicio_hermana in rango_válido(i, j, n):
+                ganancia_hermana = suma(st[inicio_hermana:inicio_hermana+n])
+                siguiente_i, siguiente_j = actualizar_rango_después(inicio_hermana)
+                futuro = f(siguiente_i, siguiente_j, 0, memo)
+                mejor = min(mejor, futuro)  # Hermana minimiza ganancia del Profesor
+
+        memo[(i, j, turno)] = mejor
+        return mejor
+
+================================================================================
+3. TABLA / TÉCNICA (T)
+================================================================================
+
+VERSIÓN 1: Arreglos (Listas de Listas)
+    Estructura:
+        memo = [[[valor for _ in range(2)] for _ in range(2*n+1)] for _ in range(2*n+1)]
+        donde memo[i][j][turno] = f(i, j, turno)
+
+    Ventajas: Acceso O(1), cache-friendly
+    Desventajas: Mayor consumo de memoria para problemas dispersos
+
+VERSIÓN 2: Tablas de Hash (Diccionarios)
+    Estructura:
+        memo = {}
+        donde memo[(i, j, turno)] = f(i, j, turno)
+
+    Ventajas: Usa memoria solo para estados necesarios
+    Desventajas: Acceso O(1) promedio pero con overhead
+
+================================================================================
+4. BORDE / CASOS BASE (B)
+================================================================================
+
+1. CONDICIÓN: Cuando quedan exactamente n porciones (una jugada válida restante)
+   ACCIÓN: El jugador actual se las come y obtiene su suma como satisfacción
+   FÓRMULA: f(i, i+n-1, turno) = suma(st[i:i+n])
+           (Si es la última jugada, retorna la suma sin recursión)
+
+2. CONDICIÓN: Cuando no quedan porciones (después de todas las jugadas)
+   ACCIÓN: Retornar 0 (no hay más satisfacción que obtener)
+   FÓRMULA: f(i, i-1, turno) = 0 (rango vacío)
+
+3. CONDICIÓN: Cuando quedan 2n porciones (inicio del juego)
+   ACCIÓN: Comienza el Profesor (turno = 0)
+   FÓRMULA: f(0, 2n-1, 0) = solución buscada
+
+================================================================================
+5. ORDEN DE CÁLCULO (O)
+================================================================================
+
+ESTRATEGIA: Llenar la tabla por LONGITUD CRECIENTE del rango
+
+Paso 1: Procesar todos los rangos de tamaño n (casos base)
+Paso 2: Procesar todos los rangos de tamaño n+1
+Paso 3: Procesar todos los rangos de tamaño n+2
+...
+Paso 2n: Procesar el rango de tamaño 2n (solución completa)
+
+PSEUDOCÓDIGO:
+
+    for len = n to 2*n:
+        for i = 0 to 2*n - len:
+            j = i + len - 1
+            for turno in [0, 1]:
+                memo[i][j][turno] = calcular(i, j, turno)
+
+Esta estrategia garantiza que cuando calculamos f(i, j, turno), todos los
+subproblemas más pequeños ya han sido resueltos.
+
+================================================================================
+6. TIPO / RESULTADO (T)
+================================================================================
+
+OUTPUT:
+    - Valor: Un número entero (o flotante)
+    - Significado: Máxima satisfacción GARANTIZADA que puede obtener el Profesor
+                   suponiendo que ambos juegan óptimamente
+
+    En el juego:
+        - El Profesor intenta MAXIMIZAR su satisfacción
+        - La Hermana intenta MINIMIZAR la satisfacción del Profesor (o maximizar la suya)
+        - El resultado es el equilibrio de Nash en estrategia pura
+
+EJEMPLO:
+    st = [1, -2, 3, -1] (n=2, hay 4 porciones)
+
+    El Profesor puede elegir:
+        - Porciones [0, 1]: satisfacción = 1 + (-2) = -1
+          Luego la Hermana elige [2, 3]: satisfacción hermana = 3 + (-1) = 2
+          Total garantizado al Profesor: -1
+
+        - Porciones [1, 2]: satisfacción = -2 + 3 = 1
+          Luego la Hermana elige [3, 0]: satisfacción hermana = -1 + 1 = 0
+          Total garantizado al Profesor: 1
+
+        - Porciones [2, 3]: satisfacción = 3 + (-1) = 2
+          Luego la Hermana elige [0, 1]: satisfacción hermana = 1 + (-2) = -1
+          Total garantizado al Profesor: 2
+
+        - Porciones [3, 0]: satisfacción = -1 + 1 = 0
+          Luego la Hermana elige [1, 2]: satisfacción hermana = -2 + 3 = 1
+          Total garantizado al Profesor: 0
+
+    La Hermana, siendo racional, elegirá la opción que MINIMICE la ganancia del Profesor.
+    El Profesor, sabiendo esto, elegirá la opción que MAXIMICE su ganancia mínima garantizada.
+
+    RESULTADO: f(0, 3, 0) = 1 (el Profesor elige [1,2] y garantiza satisfacción ≥ 1)
+
+================================================================================
+RESUMEN DEL FLUJO SRTBOT
+================================================================================
+
+                        ┌─────────────────────────────┐
+                        │    PROBLEMA: TORTA n,st[]   │
+                        └──────────────┬──────────────┘
+                                       │
+                    ┌──────────────────▼──────────────────┐
+                    │  S: f(i,j,turno) = máx garantizado  │
+                    │     para rango [i,j], turno actual  │
+                    └──────────────────┬──────────────────┘
+                                       │
+                    ┌──────────────────▼──────────────────┐
+                    │  R: Recurrencia minimax             │
+                    │     turno=0: max { suma + f(...) }  │
+                    │     turno=1: min { f(...) }         │
+                    └──────────────────┬──────────────────┘
+                                       │
+                    ┌──────────────────▼──────────────────┐
+                    │  T: Tabla (arreglo o diccionario)   │
+                    │     memo[i][j][turno] o memo{...}   │
+                    └──────────────────┬──────────────────┘
+                                       │
+                    ┌──────────────────▼──────────────────┐
+                    │  B: Casos base (tamaño rango = n)   │
+                    │     f(i,i+n-1,*) = suma(st[i:i+n])  │
+                    └──────────────────┬──────────────────┘
+                                       │
+                    ┌──────────────────▼──────────────────┐
+                    │  O: Llenar por tamaño creciente     │
+                    │     len = n, n+1, ..., 2n           │
+                    └──────────────────┬──────────────────┘
+                                       │
+                    ┌──────────────────▼──────────────────┐
+                    │  T: Retornar f(0, 2n-1, 0)          │
+                    │     Máx satisfacción garantizada    │
+                    └─────────────────────────────────────┘
+
+================================================================================
+

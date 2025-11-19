@@ -1,0 +1,451 @@
+================================================================================
+                 INFORME: PROBLEMA DE LA TORTA DE CUMPLEAÑOS
+          Entrega 1 - Análisis de Algoritmos (Tarea ADA)
+================================================================================
+
+FECHA: Noviembre 2025
+INTEGRANTES: Benjamín Farías y Francisco Solís
+ASIGNATURA: Análisis de Algoritmos
+ENTREGA: 1 (Análisis de Algoritmos - 25 pts)
+
+================================================================================
+1. CONTEXTO DEL PROBLEMA
+================================================================================
+
+En el problema de la "Torta de Cumpleaños", dos jugadores (Profesor y Hermana)
+comparten una torta redonda dividida en 2n porciones iguales distribuidas de
+manera circular.
+
+Características principales:
+  • La torta tiene 2n porciones (n es un entero positivo)
+  • Cada porción i (donde i ∈ [0, 2n-1]) tiene un valor de satisfacción st[i]
+  • Los valores st[i] pueden ser negativos, cero o positivos
+  • Los dos jugadores juegan alternadamente
+  • En cada turno, un jugador elige un ángulo α válido (que comienza en una
+    posición de porción)
+  • Quien elige el ángulo α consume las n porciones consecutivas desde α
+    hasta α + π (media vuelta de la torta)
+  • El Profesor juega primero y busca MAXIMIZAR su satisfacción garantizada
+  • La Hermana, jugando después, intenta MINIMIZAR la satisfacción del Profesor
+  • Ambos jugadores son racionales y juegan óptimamente
+
+Objetivo:
+  Calcular la máxima satisfacción garantizada que puede obtener el Profesor
+  cuando ambos jugadores actúan de manera óptima.
+
+================================================================================
+2. ÁMBITO Y ALCANCE
+================================================================================
+
+Entrega 1 - Alcance:
+  ✓ Análisis completo del problema y propuesta de solución mediante
+    Programación Dinámica
+  ✓ Descripción detallada del esquema SRTBOT
+  ✓ Implementación de la estrategia de solución en Python
+  ✓ Dos versiones de memoización: con arreglos y con diccionarios
+  ✓ Ejemplos de validación de la lógica
+  ✗ Optimizaciones de complejidad (Entrega 2+)
+  ✗ Análisis experimental de tiempos de ejecución (Entrega 2+)
+  ✗ Comparación con otras estrategias (Entrega 2+)
+
+Restricciones consideradas:
+  • El tamaño del problema es pequeño a mediano (2n ≤ 100 aproximadamente)
+  • Se busca claridad conceptual sobre optimización
+  • Se asume que el número de porciones siempre es par (2n)
+
+================================================================================
+3. ENFOQUE DE SOLUCIÓN: PROGRAMACIÓN DINÁMICA
+================================================================================
+
+Se utiliza la estrategia de PROGRAMACIÓN DINÁMICA con la metodología SRTBOT
+para descomponer el problema en subproblemas más pequeños y resolver el juego
+de manera recursiva considerando las decisiones óptimas de ambos jugadores.
+
+Razones para usar Programación Dinámica:
+  1. Estructura de subproblemas óptimos: La decisión óptima en un subproblema
+     depende de las soluciones óptimas de sus subproblemas posteriores
+  2. Superposición de subproblemas: Múltiples ramas del árbol de decisión
+     evalúan los mismos rangos de porciones
+  3. Carácter minimax: El problema inherentemente tiene alternancia entre
+     maximización (Profesor) y minimización (Hermana)
+
+Ventajas del enfoque:
+  • Evita recalcular los mismos subproblemas mediante memoización
+  • Garantiza encontrar la solución óptima mediante evaluación exhaustiva
+  • Proporciona estructura clara para rastrear el flujo del juego
+
+================================================================================
+4. ESQUEMA SRTBOT DETALLADO
+================================================================================
+
+El esquema SRTBOT es una metodología sistemática que comprende 6 componentes:
+
+────────────────────────────────────────────────────────────────────────────
+4.1 S - SUBPROBLEMA (Definición del Estado)
+────────────────────────────────────────────────────────────────────────────
+
+f(inicio, fin, turno) = máxima satisfacción garantizada para el Profesor
+                        cuando:
+                        • Quedan porciones desde el índice 'inicio' hasta
+                          el índice 'fin' (rango [inicio, fin], ambos
+                          inclusivos)
+                        • Es el turno del jugador indicado:
+                          - turno = 0: Turno del Profesor (él maximiza)
+                          - turno = 1: Turno de la Hermana (ella minimiza)
+
+Interpretación:
+  f(i, j, 0) representa lo máximo que puede garantizar el Profesor si:
+    • Solo quedan las porciones [i, j] para repartir
+    • Le toca jugar ahora (es su turno)
+
+  f(i, j, 1) representa lo máximo que puede garantizar el Profesor si:
+    • Solo quedan las porciones [i, j] para repartir
+    • La Hermana juega ahora (ella minimizará su ganancia)
+
+Dominio:
+  • inicio ∈ [0, 2n-1]
+  • fin ∈ [0, 2n-1]
+  • fin ≥ inicio
+  • turno ∈ {0, 1}
+  • Total de estados: O((2n)²) × 2 = O(n²)
+
+────────────────────────────────────────────────────────────────────────────
+4.2 R - RELACIÓN DE RECURRENCIA
+────────────────────────────────────────────────────────────────────────────
+
+CASOS BASE:
+
+1) Si tamaño < n:
+   f(i, j, turno) = 0
+
+   Explicación: Si quedan menos de n porciones, no es posible hacer una
+   jugada válida (se necesitan exactamente n porciones). Retorna 0.
+
+2) Si tamaño == n (última jugada posible):
+   f(i, i+n-1, 0) = suma de porciones de i a i+n-1
+   f(i, i+n-1, 1) = 0
+
+   Explicación:
+   • Si es turno del Profesor: Toma todas las n porciones restantes y
+     obtiene su suma como satisfacción.
+   • Si es turno de la Hermana: Ella toma las n porciones, pero eso no
+     contribuye a la satisfacción del Profesor, que obtiene 0 en este
+     subproblema.
+
+CASO RECURSIVO:
+
+Si tamaño > n:
+
+a) Turno del PROFESOR (turno = 0, MAXIMIZA):
+
+   f(i, j, 0) = max { suma(i+k, i+k+n) + f(i+k+n, j, 1) }
+                para k = 0, 1, 2, ..., j - i - n
+
+   Explicación:
+   • El Profesor elige n porciones consecutivas comenzando en posición i+k
+   • Obtiene suma(i+k, i+k+n): la suma de satisfacciones de esas porciones
+   • Luego le toca a la Hermana con el rango [i+k+n, j]
+   • El Profesor quiere maximizar: ganancia actual + ganancia futura
+
+b) Turno de la HERMANA (turno = 1, MINIMIZA):
+
+   f(i, j, 1) = min { f(i+k+n, j, 0) }
+                para k = 0, 1, 2, ..., j - i - n
+
+   Explicación:
+   • La Hermana elige n porciones consecutivas comenzando en posición i+k
+   • Ella NO suma satisfacción (solo nos importa la del Profesor)
+   • Luego le toca al Profesor con el rango [i+k+n, j]
+   • La Hermana quiere minimizar la satisfacción del Profesor
+   • Por lo tanto, elige la opción que resulta en f(i+k+n, j, 0) mínimo
+
+TRANSICIONES:
+  • De un estado con rango [i, j] se transiciona a estados con rango
+    más pequeño [i+k+n, j]
+  • Cada transición consume exactamente n porciones
+  • El proceso continúa hasta que quedan exactamente n porciones (caso base)
+
+────────────────────────────────────────────────────────────────────────────
+4.3 T - TABLA (Estructura de Datos para Memoización)
+────────────────────────────────────────────────────────────────────────────
+
+Se implementan DOS VERSIONES:
+
+VERSIÓN 1: ARREGLOS (Listas de Listas)
+  Estructura:
+    memo[i][j][turno] = valor de f(i, j, turno)
+
+  Detalles:
+    • memo es una lista 3D de tamaño [2n] × [2n] × [2]
+    • Cada celda contiene un número entero o flotante
+    • memo[i][j][0] = satisfacción máxima si quedan [i,j] y juega Profesor
+    • memo[i][j][1] = satisfacción máxima si quedan [i,j] y juega Hermana
+
+  Inicialización:
+    memo = [[[-float("inf") for _ in range(2)] for _ in range(2n)]
+            for _ in range(2n)]
+
+  Ventajas:
+    • Acceso O(1) a cualquier estado
+    • Buena localidad de caché (mejor rendimiento)
+
+  Desventajas:
+    • Usa O((2n)²) memoria incluso para estados no visitados
+    • Más memoria que hash tables para problemas dispersos
+
+VERSIÓN 2: DICCIONARIOS (Hash Tables)
+  Estructura:
+    memo = {}
+    donde memo[(i, j, turno)] = valor de f(i, j, turno)
+
+  Detalles:
+    • Usa clave tupla (i, j, turno) para almacenar valores
+    • Solo guarda estados calculados (no todos los posibles)
+
+  Inicialización:
+    memo = {}
+
+  Ventajas:
+    • Usa menos memoria en casos donde no se visitan todos los estados
+    • Acceso promedio O(1), peor caso O(n)
+
+  Desventajas:
+    • Overhead de hashing
+    • Peor localidad de caché que arreglos
+
+────────────────────────────────────────────────────────────────────────────
+4.4 B - BORDE (Casos Base y Condiciones Límite)
+────────────────────────────────────────────────────────────────────────────
+
+Condición 1: Menos de n porciones
+  • Parámetro: tamaño = fin - inicio + 1 < n
+  • Acción: return 0
+  • Razón: No se puede hacer una jugada válida
+
+Condición 2: Exactamente n porciones - Turno del Profesor
+  • Parámetro: tamaño == n AND turno == 0
+  • Acción: return suma(inicio, fin+1)
+  • Razón: El Profesor toma las únicas n porciones disponibles
+
+Condición 3: Exactamente n porciones - Turno de la Hermana
+  • Parámetro: tamaño == n AND turno == 1
+  • Acción: return 0
+  • Razón: La Hermana toma las porciones pero no suman al Profesor
+
+Estado inicial (lo que buscamos):
+  • f(0, 2n-1, 0) = máxima satisfacción garantizada del Profesor
+  • Comienza con todas las porciones y turno del Profesor
+
+────────────────────────────────────────────────────────────────────────────
+4.5 O - ORDEN (Estrategia de Cálculo)
+────────────────────────────────────────────────────────────────────────────
+
+ESTRATEGIA: Bottom-Up por tamaño creciente de rango (para versión con arreglos)
+
+Orden de Ejecución (versión con arreglos):
+  1. Llenar todos los estados con tamaño = n (casos base)
+  2. Llenar todos los estados con tamaño = n + 1
+  3. Llenar todos los estados con tamaño = n + 2
+  ...
+  2n. Llenar los estados con tamaño = 2n (incluye f(0, 2n-1, 0))
+
+Pseudocódigo:
+  for tamaño = n to 2n:
+      for inicio = 0 to 2n-1:
+          fin = inicio + tamaño - 1
+          if fin >= 2n:
+              continue
+          for turno = 0 to 1:
+              memo[inicio][fin][turno] = calcular(inicio, fin, turno)
+
+Garantías:
+  • Cuando procesamos f(i, j, turno), todos los subproblemas más pequeños
+    f(i', j', turno') donde j' - i' < j - i ya han sido calculados
+  • Por lo tanto, podemos usar sus valores directamente
+
+ALTERNATIVA: Top-Down con Memoización (versión con diccionarios)
+  • Se calcula bajo demanda recursivamente
+  • El primer cálculo de f(0, 2n-1, 0) dispara la recursión
+  • La memoización evita recalcular subproblemas
+
+────────────────────────────────────────────────────────────────────────────
+4.6 T - TIPO/TRANSICIÓN (Resultado Final)
+────────────────────────────────────────────────────────────────────────────
+
+Tipo de dato:
+  • Entero o Flotante (depende de los valores en st)
+  • Rango: Desde sum(min(st)) hasta sum(max(st))
+
+Cálculo final:
+  resultado = f(0, 2n-1, 0)
+
+  Esta función retorna la máxima satisfacción que puede garantizar el Profesor
+  cuando comienza el juego (rango completo, su turno).
+
+Interpretación del resultado:
+  • Si el resultado es positivo: el Profesor puede garantizar ganancia
+  • Si el resultado es negativo: el Profesor no puede evitar pérdida
+  • Si el resultado es cero: el juego es "equilibrado" para el Profesor
+
+================================================================================
+5. ANÁLISIS DE LA SOLUCIÓN
+================================================================================
+
+5.1 Correctitud
+──────────────
+
+La solución es correcta porque:
+  1. Descompone correctamente el problema en subproblemas disjuntos
+  2. La relación de recurrencia evalúa TODAS las opciones posibles en cada turno
+  3. El Profesor maximiza (elige mejor opción) y la Hermana minimiza (elige peor opción para él)
+  4. Los casos base son correctos y alcanzan todas las situaciones terminales
+  5. El algoritmo garantiza encontrar la solución óptima mediante búsqueda exhaustiva
+
+5.2 Complejidad
+───────────────
+
+Número de estados:
+  • O((2n)²) estados diferentes para rangos [i, j]
+  • × 2 para los dos valores de turno
+  • Total: O(n²) estados únicos
+
+Tiempo por estado:
+  • Cada estado evalúa O(n) transiciones posibles
+  • (Cada jugador elige dónde comenzar su rango de n porciones)
+
+Complejidad Total:
+  • Tiempo: O(n²) × O(n) = O(n³)
+  • Espacio: O(n²) para la tabla de memoización
+
+Para 2n = 100 (n = 50):
+  • Estados: ~10,000
+  • Transiciones totales: ~500,000 operaciones
+  • Tiempo estimado: < 1 segundo en Python
+
+5.3 Correctitud de Ejemplos
+────────────────────────────
+
+EJEMPLO 1: st = [1, -2, 3, -1], n = 2
+
+Simulación:
+  Turno Profesor:
+    Opción 1: Elige [0,1] → ganancia = 1+(-2) = -1
+      Hermana elige [2,3] → Hermana obtiene 3+(-1) = 2
+      Total Profesor: -1
+
+    Opción 2: Elige [1,2] → ganancia = -2+3 = 1
+      Hermana elige [3,0] (circular) → Hermana obtiene -1+1 = 0
+      Total Profesor: 1
+
+    Opción 3: Elige [2,3] → ganancia = 3+(-1) = 2
+      Hermana elige [0,1] → Hermana obtiene 1+(-2) = -1
+      Total Profesor: 2
+
+  El Profesor elige Opción 3 (máximo = 2)
+  Resultado esperado: 2 ✓
+
+EJEMPLO 3: st = [10, 5], n = 1
+
+Simulación:
+  Turno Profesor:
+    Opción 1: Elige [0] → ganancia = 10
+      Hermana elige [1] → No suma para Profesor
+      Total Profesor: 10
+
+    Opción 2: Elige [1] → ganancia = 5
+      Hermana elige [0] → No suma para Profesor
+      Total Profesor: 5
+
+  El Profesor elige Opción 1 (máximo = 10)
+  Resultado esperado: 10 ✓
+
+================================================================================
+6. EJEMPLOS Y VALIDACIÓN
+================================================================================
+
+Se proporcionan 4 ejemplos con análisis manual y validación computacional:
+
+EJEMPLO 1: Satisfacciones mixtas
+  Input:  n=2, st = [1, -2, 3, -1]
+  Output: 2
+  Validación: ✓ Ambas versiones coinciden
+
+EJEMPLO 2: Tamaño mayor
+  Input:  n=3, st = [5, -3, 2, 4, -1, 3]
+  Output: 6
+  Validación: ✓ Ambas versiones coinciden
+
+EJEMPLO 3: Caso trivial (n=1)
+  Input:  n=1, st = [10, 5]
+  Output: 10
+  Validación: ✓ Ambas versiones coinciden, resultado correcto
+
+EJEMPLO 4: Todas positivas
+  Input:  n=2, st = [10, 8, 6, 4]
+  Output: 18
+  Validación: ✓ Ambas versiones coinciden
+
+================================================================================
+7. IMPLEMENTACIÓN
+================================================================================
+
+Se proporcionan dos versiones funcionales en Python 3:
+
+VERSIÓN 1: satisfaccion_hash(st, n)
+  • Usa memoización con diccionarios
+  • Implementa recursión top-down
+  • Código más compacto y más fácil de entender el flujo lógico
+
+VERSIÓN 2: satisfaccion_arreglo(st, n)
+  • Usa memoización con arreglos
+  • Implementa iteración bottom-up por tamaño creciente
+  • Demonstra la estrategia de programación dinámica clásica
+
+Ambas versiones producen resultados idénticos.
+
+================================================================================
+8. ESTRUCTURA DE ARCHIVOS ENTREGADOS
+================================================================================
+
+/tarea-ada/
+├── main.py                  # Código Python con ambas implementaciones
+├── srtbot_esquema.txt      # Documento con esquema SRTBOT detallado
+└── informe_entrega1.txt    # Este archivo
+
+================================================================================
+9. CONCLUSIONES
+================================================================================
+
+1. DISEÑO: El esquema SRTBOT proporciona un marco sistémático y completo
+   para analizar y resolver el problema de la torta.
+
+2. CORRECTITUD: Las dos implementaciones (hash y arreglos) producen resultados
+   idénticos, validando la correctitud del algoritmo.
+
+3. EFICIENCIA: La complejidad O(n³) es aceptable para tamaños de entrada
+   razonables (n ≤ 50).
+
+4. CLARIDAD: El código está bien comentado y estructurado, facilitando
+   la comprensión del algoritmo.
+
+5. EXTENSIBILIDAD: El marco permite fácilmente agregar optimizaciones
+   en entregas posteriores (memorización con estruturas más eficientes,
+   análisis experimental, etc.).
+
+================================================================================
+REFERENCIAS TEÓRICAS
+================================================================================
+
+El enfoque se basa en principios clásicos de:
+  • Programación Dinámica (Bellman)
+  • Teoría de Juegos Combinatorios (Minimax)
+  • Análisis de Algoritmos
+
+Conceptos clave:
+  • Principio de Optimalidad de Bellman: Una solución óptima está compuesta
+    de soluciones óptimas de subproblemas
+  • Algoritmo Minimax: Para juegos de dos jugadores, se maximiza bajo control
+    propio y se minimiza bajo control del oponente
+
+================================================================================
+
